@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>群晖文件管理器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      opacity: 0.9;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 10px;
+      padding: 25px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .panel h2 {
+      color: #333;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #667eea;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 25px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+
+    .btn:hover {
+      background: #5568d3;
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+    }
+
+    .btn-danger:hover {
+      background: #c0392b;
+    }
+
+    .file-list {
+      margin-top: 15px;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 5px;
+      margin-bottom: 8px;
+      transition: background 0.2s;
+    }
+
+    .file-item:hover {
+      background: #f0f0f0;
+    }
+
+    .file-icon {
+      width: 32px;
+      height: 32px;
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .file-folder .file-icon {
+      color: #f39c12;
+    }
+
+    .file-file .file-icon {
+      color: #3498db;
+    }
+
+    .file-info {
+      flex: 1;
+    }
+
+    .file-name {
+      font-weight: 500;
+      color: #333;
+    }
+
+    .file-meta {
+      font-size: 12px;
+      color: #999;
+      margin-top: 3px;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .file-actions button {
+      padding: 5px 12px;
+      font-size: 12px;
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+
+    .loading.show {
+      display: block;
+    }
+
+    .upload-progress {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f9f9f9;
+      border-radius: 5px;
+      display: none;
+    }
+
+    .upload-progress.show {
+      display: block;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 5px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: #667eea;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📁 群晖文件管理器</h1>
+      <p>Node.js + Synology FileStation API</p>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <!-- 文件浏览面板 -->
+    <div class="panel">
+      <h2>📂 文件浏览</h2>
+      <div class="form-group">
+        <label>浏览路径:</label>
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="browsePath" value="/upload" placeholder="输入路径，如 /home">
+          <button class="btn" onclick="loadFiles()">浏览</button>
+        </div>
+      </div>
+      <div class="loading" id="loading">加载中...</div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <!-- 文件上传面板 -->
+    <div class="panel">
+      <h2>⬆️ 文件上传</h2>
+      <div class="form-group">
+        <label>选择文件:</label>
+        <input type="file" id="uploadFile">
+      </div>
+      <div class="form-group">
+        <label>目标文件夹:</label>
+        <input type="text" id="uploadFolder" value="/upload" placeholder="如 /upload/Documents">
+      </div>
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="overwrite"> 覆盖已存在文件
+        </label>
+      </div>
+      <button class="btn" onclick="uploadFile()">上传文件</button>
+      <div class="upload-progress" id="uploadProgress">
+        <div>上传中: <span id="uploadStatus">0%</span></div>
+        <div class="progress-bar">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建文件夹面板 -->
+    <div class="panel">
+      <h2>📁 创建文件夹</h2>
+      <div class="form-group">
+        <label>父文件夹:</label>
+        <input type="text" id="newFolderPath" value="/upload" placeholder="如 /upload">
+      </div>
+      <div class="form-group">
+        <label>文件夹名称:</label>
+        <input type="text" id="newFolderName" placeholder="如 MyNewFolder">
+      </div>
+      <button class="btn" onclick="createFolder()">创建文件夹</button>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+
+    // 显示消息
+    function showMessage(message, type = 'success') {
+      const messageEl = document.getElementById('message');
+      messageEl.textContent = message;
+      messageEl.className = `message ${type}`;
+      messageEl.style.display = 'block';
+      setTimeout(() => {
+        messageEl.style.display = 'none';
+      }, 5000);
+    }
+
+    // 显示/隐藏加载状态
+    function setLoading(show) {
+      document.getElementById('loading').classList.toggle('show', show);
+    }
+
+    // 加载文件列表
+    async function loadFiles() {
+      const path = document.getElementById('browsePath').value.trim();
+      if (!path) {
+        showMessage('请输入有效路径', 'error');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/files?path=${encodeURIComponent(path)}&limit=100`);
+        const result = await response.json();
+
+        if (result.success) {
+          displayFiles(result.files, result.path);
+          showMessage(`成功加载 ${result.total} 个文件`);
+        } else {
+          showMessage(`加载失败: ${result.message}`, 'error');
+        }
+      } catch (error) {
+        showMessage(`请求失败: ${error.message}`, 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // 显示文件列表
+    function displayFiles(files, currentPath) {
+      const fileListEl = document.getElementById('fileList');
+
+      if (files.length === 0) {
+        fileListEl.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">文件夹为空</p>';
+        return;
+      }
+
+      fileListEl.innerHTML = files.map(file => {
+        const isDir = file.isdir;
+        const size = isDir ? '' : formatSize(file.size);
+        return `
+          <div class="file-item ${isDir ? 'file-folder' : 'file-file'}">
+            <div class="file-icon">${isDir ? '📁' : '📄'}</div>
+            <div class="file-info">
+              <div class="file-name">${file.name}</div>
+              <div class="file-meta">${file.path}${size ? ' • ' + size : ''}</div>
+            </div>
+            <div class="file-actions">
+              ${isDir ? `
+                <button class="btn" onclick="browseFolder('${file.path}')">进入</button>
+              ` : `
+                <button class="btn" onclick="downloadFile('${file.path}')">下载</button>
+              `}
+              <button class="btn btn-danger" onclick="deleteFile('${file.path}')">删除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 进入文件夹
+    function browseFolder(path) {
+      document.getElementById('browsePath').value = path;
+      loadFiles();
+    }
+
+    // 下载文件
+    async function downloadFile(path) {
+      try {
+        const fileName = path.split('/').pop();
+        const response = await fetch(`${API_BASE}/api/download?path=${encodeURIComponent(path)}`);
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          showMessage('下载成功');
+        } else {
+          const result = await response.json();
+          showMessage(`下载失败: ${result.message}`, 'error');
+        }
+      } catch (error) {
+        showMessage(`下载失败: ${error.message}`, 'error');
+      }
+    }
+
+    // 删除文件
+    async function deleteFile(path) {
+      if (!confirm(`确定要删除 ${path} 吗？`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/files?path=${encodeURIComponent(path)}`, {
+          method: 'DELETE'
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          showMessage('删除成功');
+          loadFiles(); // 重新加载文件列表
+        } else {
+          showMessage(`删除失败: ${result.message}`, 'error');
+        }
+      } catch (error) {
+        showMessage(`删除失败: ${error.message}`, 'error');
+      }
+    }
+
+    // 上传文件
+    async function uploadFile() {
+      const fileInput = document.getElementById('uploadFile');
+      const folderInput = document.getElementById('uploadFolder');
+      const overwrite = document.getElementById('overwrite').checked;
+
+      const file = fileInput.files[0];
+      const folder = folderInput.value.trim();
+
+      if (!file) {
+        showMessage('请选择要上传的文件', 'error');
+        return;
+      }
+
+      if (!folder) {
+        showMessage('请输入目标文件夹路径', 'error');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', folder);
+      formData.append('overwrite', overwrite);
+
+      const progressEl = document.getElementById('uploadProgress');
+      const progressBar = document.getElementById('progressBar');
+      const uploadStatus = document.getElementById('uploadStatus');
+
+      progressEl.classList.add('show');
+      progressBar.style.width = '0%';
+      uploadStatus.textContent = '0%';
+
+      try {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = `${percent}%`;
+            uploadStatus.textContent = `${percent}%`;
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            const result = JSON.parse(xhr.responseText);
+            if (result.success) {
+              showMessage('上传成功');
+              document.getElementById('uploadFile').value = '';
+              loadFiles(); // 重新加载文件列表
+            } else {
+              showMessage(`上传失败: ${result.message}`, 'error');
+            }
+          } else {
+            showMessage('上传失败', 'error');
+          }
+          progressEl.classList.remove('show');
+        });
+
+        xhr.addEventListener('error', () => {
+          showMessage('上传失败', 'error');
+          progressEl.classList.remove('show');
+        });
+
+        xhr.addEventListener('timeout', () => {
+          showMessage('上传超时，请重试或检查网络连接', 'error');
+          progressEl.classList.remove('show');
+        });
+
+        xhr.open('POST', `${API_BASE}/api/upload`);
+        xhr.timeout = 60000; // 60秒超时
+        xhr.send(formData);
+      } catch (error) {
+        showMessage(`上传失败: ${error.message}`, 'error');
+        progressEl.classList.remove('show');
+      }
+    }
+
+    // 创建文件夹
+    async function createFolder() {
+      const path = document.getElementById('newFolderPath').value.trim();
+      const name = document.getElementById('newFolderName').value.trim();
+
+      if (!path || !name) {
+        showMessage('请填写所有必填项', 'error');
+        return;
+      }
+
+      // Synology不允许纯数字文件夹名，自动添加前缀
+      let finalName = name;
+      if (/^\d+$/.test(name)) {
+        const prefix = 'folder_';
+        finalName = prefix + name;
+        showMessage(`文件夹名已自动调整为: ${finalName}`, 'success');
+      }
+      try {
+        const response = await fetch(`${API_BASE}/api/folders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ path, name: finalName })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          showMessage('文件夹创建成功');
+          document.getElementById('newFolderName').value = '';
+          loadFiles(); // 重新创建文件夹列表
+        } else {
+          showMessage(`创建失败: ${result.message}`, 'error');
+        }
+      } catch (error) {
+        showMessage(`创建失败: ${error.message}`, 'error');
+      }
+    }
+
+    // 格式化文件大小
+    function formatSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // 页面加载时加载默认路径
+    window.onload = function() {
+      loadFiles();
+    };
+  </script>
+</body>
+</html>
